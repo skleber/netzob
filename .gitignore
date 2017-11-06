@@ -10,13 +10,13 @@
 /.project
 /.pydevproject
 /doc/netzob.1
-/build/*
 /netzob.bat
 *.egg-info
 /resources/static/netzob/locales/netzob.pot
 *.mo
 .tox
-doc/documentation/build/
+/netzob/build/
+netzob/doc/documentation/build/
 /doc/api
 src/netzob_plugins/*/*/build/
 src/netzob_plugins/*/*/dist/
@@ -29,4 +29,4 @@ include/python*
 lib/python*
 lib64
 *.log
-dist/
+netzob/dist/
