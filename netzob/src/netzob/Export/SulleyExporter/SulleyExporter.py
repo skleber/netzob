@@ -33,183 +33,196 @@
 # +---------------------------------------------------------------------------+
 
 # Import necessary scripts from netzob codes
-from netzob.Common.all import *
-from netzob.Inference.all import *
-from netzob.Import.all import *
+from netzob.Export.AbstractExporter import AbstractExporter
+from netzob.Model.Vocabulary.Types.all import *
+from netzob.Model.Vocabulary.Domain.Variables.SVAS import SVAS
 
-# Related third party packages
-import rlcompleter
-import readline
-import code
 
-#Main class
-class SulleyExporter(object):
-        """ Sulley Exporter to export the output 
-               of the Inference to txt file
+class SulleyExporter(AbstractExporter):
+    """
+    Sulley Exporter to export the output
+           of the Inference to .py file in sulley-style
+    """
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def exportToSulley(symbols, filename):
         """
-        def __init__(self):
-            pass
+        Usage:
+        >>> SulleyExporter().exportToSulley(symbols,'outputFilename.py')
+        """
 
-        def exportToSulley(self, symbols, filename):
-            """ 
-                    Usage: >>> SulleyExporter().exportToSulley(symbols,'outputFilenane')
-            """
-            sfilecontents = ''
-            try:
-                iter(symbols)
-                for syml in symbols:
-                        sfilecontents += "# === Start of new SYMBOL " + syml.name + '\n'
-                        sfilecontents += "s_initialize(\"new request {}\")".format(syml.name) + '\n'
-                        for field in syml.fields:
-                                try:
-                                        sfilecontents += self.svas_valuefilter(field.domain) + '\n'
-                                except AttributeError:
-                                        size0,size1 = self.aggDomain(field.domain,[],1000,0)
-                                        sfilecontents += '# variable field \n' + 's_random' + '(' +str(size0) + ',' + str(size1) + ')' + '\n'
-                        sfilecontents += '\n'
-                        print(sfilecontents)
-                with open(filename,'w') as f:
-                    f.write(sfilecontents)
-                    f.close()
-            except TypeError:
-                syml = symbols
-                sfilecontents += "# === Start of new SYMBOL " + syml.name + '\n'
-                sfilecontents += "s_initialize(\"new request {}\")".format(syml.name) + '\n'
-                for field in syml.fields:
-                        try:
-                                        sfilecontents += self.svas_valuefilter(field.domain) + '\n'
-                        except AttributeError:
-                                        size0,size1 = self.aggDomain(field.domain,[],1000,0)
-                                        sfilecontents += '# variable field \n' + 's_random' + '(' +str(size0) + ',' + str(size1) + ')' + '\n'
-                        print(sfilecontents)
-                with open(filename,'w') as f:
-                        f.write(sfilecontents)
-                        f.close()
+        try:
+            iter(symbols)  # checks if the symbols are iterable
+        except TypeError:  # if its only one symbol
+            symbols = [symbols]
 
-# To find the size of the Merged Field
-        def aggDomain(self, domain,remaining_domain, size0, size1):
-                if str(domain.children[1]) == 'Agg' and str(domain.children[0]) != 'Agg':
-                        sizefield1 = list(domain.children[0].dataType.size)
-                        size0 = min(sizefield1[0],size0)
-                        size1 = size1 + sizefield1[1]
-                        return self.aggDomain(domain.children[1], remaining_domain,size0, size1)
-                elif str(domain.children[0]) == 'Agg' and str(domain.children[1]) != 'Agg':
-                        sizefield = list(domain.children[1].dataType.size)
-                        size0 = min(sizefield[0],size0)
-                        size1 = size1 + sizefield[1]
-                        return self.aggDomain(domain.children[0],remaining_domain,size0,size1)
-                elif str(domain.children[0]) == 'Agg' and str(domain.children[1]) == 'Agg':
-                        remaining_domain.append(domain.children[1])
-                        return self.aggDomain(domain.children[0],remaining_domain,size0,size1)
-                else:
-                        sizefield0 = list(domain.children[0].dataType.size)
-                        sizefield1 = list(domain.children[1].dataType.size)
-                        size0 = min(size0,sizefield0[0],sizefield1[0])
-                        size1 = size1 + sizefield0[1] + sizefield1[1]
-                if(remaining_domain):
-                        return self.aggDomain(remaining_domain.pop(),remaining_domain,size0,size1)
-                else:
-                        return size0,size1
+        sfilecontents = ""
+        for syml in symbols:
+            sfilecontents += "# === Start of new SYMBOL {}\n".format(syml.name)
+            sfilecontents += "s_initialize(\"new request {}\")\n".format(syml.name)
+            for field in syml.fields:
+                try:
+                    sfilecontents += SulleyExporter._svas_valuefilter(field.domain) + '\n'
+                except AttributeError:
+                    size0, size1 = SulleyExporter._aggDomain(field.domain)
+                    sfilecontents += '# variable field \ns_random({:d},{:d})\n'.format(size0, size1)
+            sfilecontents += '\n'
 
-# Raw data type case
-        def dataType_raw(self, dataType):
-                command = 's_random'
-                parameters = [
-                        str(dataType.size[0]),
-                        str(dataType.size[1])
-                ] # minimum, maximum length
-                return '# variable field \n' + command + '(' \
-                        + ','.join(parameters) \
-                        + ')'
+        with open(filename,'w') as f:
+                f.write(sfilecontents)
+                f.close()
 
-# ASCII string data type
-        def dataType_ascii(self, dataType):
-                command = 's_string'
-                if dataType.size[0] == dataType.size[1]:
-                        size = dataType.size[0] # fixed length
-                else:
-                        size = -1 # variable length
-                parameters = [
-                        str(size)
-                         ]
-                return '# variable string field \n' + command + '(' \
-                        + ','.join(parameters) \
-                        + ')'
 
-# Integer data type
-# uses honors dataType.endianness. For values see AbstractType.supportedEndianness()
-        def dataType_integer(self, dataType):
-                if dataType.size[1] <= 1*8:
-                        command = 's_byte'
-                elif dataType.size[1] <= 2*8:
-                        command = 's_short'
-                elif dataType.size[1] <= 4*8:
-                        command = 's_int'
-                elif dataType.size[1] <= 8*8:
-                        command = 's_double'
-                else:
-                        return dataType_raw(dataType)
+    @staticmethod
+    def _dataType_raw(dataType):
+        """
+        Raw data type case
+
+        :param dataType:
+        :return:
+        """
+
+        command = 's_random'
+        parameters = [
+                str(dataType.size[0]),
+                str(dataType.size[1])
+        ] # minimum, maximum length
+        return '# variable field \n{}({})'.format(
+            command,
+            ','.join(parameters)
+        )
+
+    @staticmethod
+    def _dataType_ascii(dataType):
+        """
+        ASCII string data type
+
+        :param dataType:
+        :return:
+        """
+
+        command = 's_string'
+        if dataType.size[0] == dataType.size[1]:
+                size = dataType.size[0] # fixed length
+        else:
+                size = -1 # variable length
+        parameters = [
+                str(size)
+                 ]
+        return '# variable string field \n{}({})'.format(
+            command,
+            ','.join(parameters)
+        )
+
+
+    @staticmethod
+    def _dataType_integer(dataType):
+        """
+        Integer data type
+
+        uses honors dataType.endianness. For values see AbstractType.supportedEndianness()
+
+        :param dataType:
+        :return:
+        """
+
+        if dataType.size[1] <= 1*8:
+                command = 's_byte'
+        elif dataType.size[1] <= 2*8:
+                command = 's_short'
+        elif dataType.size[1] <= 4*8:
+                command = 's_int'
+        elif dataType.size[1] <= 8*8:
+                command = 's_double'
+        else:
+                return SulleyExporter._dataType_raw(dataType)
      
-     # Values: AbstractType.supportedEndianness()
-                if dataType.endianness == 'big':
-                        parameters = [
-                                str('">"')
-                                ]
-                else: # dataType.endianness == 'little'
-                        parameters = [
-                                str('"<"')
-                                ]
-    # Not honored: AbstractType.supportedSign() // str(domain.dataType.sign)
-    # In Sulley signed integers are only possible with ASCII-representation
-    # Netzob would not return this as integer, but as string
-    # So this is not possible to support easily.
-                return '# variable integer field \n' + command + '(' \
-                        + ','.join(parameters) \
-                        + ')'
+        # Values: AbstractType.supportedEndianness()
+        if dataType.endianness == 'big':
+                parameters = [
+                        str('">"')
+                        ]
+        else: # dataType.endianness == 'little'
+                parameters = [
+                        str('"<"')
+                            ]
+        # Not honored: AbstractType.supportedSign() // str(domain.dataType.sign)
+        # In Sulley signed integers are only possible with ASCII-representation
+        # Netzob would not return this as integer, but as string
+        # So this is not possible to support easily.
 
-# dataType switcher
-# list of key values can be obtained by AbstractType.supportedTypes()
-# Not supported: AbstractType.supportedUnitSize() // str(domain.dataType.unitSize)
-        def dataType_valuefilter(self, dataType):
-                switcher = {
-                        'Integer'   : self.dataType_integer,
-                        'BitArray'  : self.dataType_raw,
-                        'Raw'       : self.dataType_raw,
-                        'ASCII'     : self.dataType_ascii,
-                        'HexaString': self.dataType_raw,
-                        'IPv4'      : self.dataType_raw, # this should be improved
-                }
-                return switcher.get(dataType.typeName, self.dataType_raw)(dataType)
+        return '# variable integer field \n{}({})'.format(
+            command,
+            ','.join(parameters)
+        )
 
 
+    @staticmethod
+    def _dataType_valuefilter(dataType):
+        """
+        dataType switcher
+
+        Not supported: AbstractType.supportedUnitSize() // str(domain.dataType.unitSize)
+
+        :param dataType: list of key values can be obtained by AbstractType.supportedTypes()
+        :return: calls the method valid for the dataType, one of _dataType_raw, _dataType_integer, _dataType_ascii
+        """
+
+        switcher = {
+            'Integer'   : SulleyExporter._dataType_integer,
+            'BitArray'  : SulleyExporter._dataType_raw,
+            'Raw'       : SulleyExporter._dataType_raw,
+            'ASCII'     : SulleyExporter._dataType_ascii,
+            'HexaString': SulleyExporter._dataType_raw,
+            'IPv4'      : SulleyExporter._dataType_raw, # this should be improved
+        }
+        return switcher.get(dataType.typeName, SulleyExporter._dataType_raw)(dataType)
 
 
-# For constant fields, return fixed value in hex-representation (\xFF)
-        def svas_constant(self, domain):
-                return '# constant field \ns_binary("' \
-                        + repr(TypeConverter.convert(domain.currentValue, BitArray, HexaString)) \
-                        + '", fuzzable=False)'
-#                return '# constant field \ns_binary("' \
-#                        + HexaString.encode(domain.currentValue, \
-#                                domain.dataType.unitSize, domain.dataType.endianness, \
-#                                        domain.dataType.sign) \
-#                        + '", fuzzable=False)'
+    @staticmethod
+    def _svas_constant(domain):
+        """
+        For constant fields, return fixed field value in hex-representation (\xFF)
 
-# For variable fields, return properties: typeName, minlen, maxlen, endianness, unitSize, sign
-# domain.dataType.typeName that can be
-# Raw, ASCII, Integer, BitArray, HexaString, IPv4, Timestamp
-        def svas_variable(self,domain):
-                return self.dataType_valuefilter(domain.dataType)
-    # To iterate: AbstractType.supportedTypes() // domain.dataType.typeName
-    # if globals()[domain.dataType.typeName] in AbstractType.supportedTypes():
+        :param domain: domain to extract the value of
+        :return:
+        """
+        return '# constant field \ns_binary("{}", fuzzable=False)'.format(
+            repr(TypeConverter.convert(domain.currentValue, BitArray, HexaString))
+        )
 
-# State Variable Assignment Strategy "decode"
-        def svas_valuefilter(self,domain):
-                switcher = {
-                        SVAS.CONSTANT:   self.svas_constant,
-                        SVAS.EPHEMERAL:  self.svas_variable,
-                        SVAS.PERSISTENT: self.svas_constant,
-                        SVAS.VOLATILE:   self.svas_variable,
-                }
-                return switcher.get(domain.svas, self.svas_variable)(domain)
+
+    @staticmethod
+    def _svas_variable(domain):
+        """
+        For variable fields, return properties: typeName, minlen, maxlen, endianness, unitSize, sign
+
+        domain.dataType.typeName can be
+        Raw, ASCII, Integer, BitArray, HexaString, IPv4, Timestamp
+
+        :param domain: domain to extract the value of
+        :return:
+        """
+        return SulleyExporter._dataType_valuefilter(domain.dataType)
+        # To iterate: AbstractType.supportedTypes() // domain.dataType.typeName
+        # if globals()[domain.dataType.typeName] in AbstractType.supportedTypes():
+
+
+    @staticmethod
+    def _svas_valuefilter(domain):
+        """
+        "State Variable Assignment Strategy" decode
+
+        :param domain: domain to extract the SVAS of
+        :return: calls the method valid for the SVAS, one of _svas_constant, _svas_variable
+        """
+        switcher = {
+            SVAS.CONSTANT:   SulleyExporter._svas_constant,
+            SVAS.EPHEMERAL:  SulleyExporter._svas_variable,
+            SVAS.PERSISTENT: SulleyExporter._svas_constant,
+            SVAS.VOLATILE:   SulleyExporter._svas_variable,
+        }
+        return switcher.get(domain.svas, SulleyExporter._svas_variable)(domain)
 

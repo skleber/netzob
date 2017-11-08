@@ -34,20 +34,16 @@
 
 # Import necessary scripts from netzob codes
 from netzob.Common.all import *
-from netzob.Inference.all import *
-from netzob.Import.all import *
 from netzob.Common.Utils.Decorators import NetzobLogger
+from netzob.Export.AbstractExporter import AbstractExporter
 
 # Related third party packages
-import rlcompleter
-import readline
-import code
 import re
 import keyword
 
 #Main class
 @NetzobLogger
-class ScapyExporter(object):
+class ScapyExporter(AbstractExporter):
         """ Scapy Exporter to export the output 
                 of the Inference to a python file which can later be executed in Scapy
         """
@@ -136,8 +132,8 @@ class ScapyExporter(object):
                        sfilecontents += self._check_dataType(field) + '\n'
                     except AttributeError:
                        sfilecontents += "\t\t\t BitField(" + "\"" + field.name + "\","+repr(None)+ "," \
-                                        + repr(self._aggDomain(field.domain)[1]) + ")," \
-                                        + "\t#size:" + str(self._aggDomain(field.domain)) + '\n'
+                                        + repr(ScapyExporter._aggDomain(field.domain)[1]) + ")," \
+                                        + "\t#size:" + str(ScapyExporter._aggDomain(field.domain)) + '\n'
 
                 sfilecontents += "\t\t ]" + '\n'
 
@@ -174,43 +170,6 @@ class ScapyExporter(object):
                 for field, value in zip(eachSymbol.fields, fl_n_value):
                     self.__reFieldLengths[field] = value
 
-
-        def _aggDomain(self, domain):
-            """
-            To find the size of the Merged Field.
-
-            Parameters have the following meanings
-            :param domain: value of field.domain
-            :return The size of the merged field including the size of all of its children
-
-            >>> m1 = RawMessage("someexamplemessage")
-            >>> fields = [ \
-                    Field("some", name="f0"), \
-                    Field( Agg([ Agg ([ Raw("ex"), Raw("ample") ]), Raw("message") ]), name="f1") \
-                ]
-            >>> symbol = Symbol(fields, messages=[m1])
-            >>> se = ScapyExporter(symbol)
-            >>> se.exportToScapy("scapy_test_agg.py")
-            >>> se._aggDomain(fields[1].domain)
-            (0, 112)
-
-            >>> ofields = [ \
-                    Field( Agg([ Raw("some"), Agg ([ Raw("ex"), Raw("ample") ]),  ]), name="f0"), \
-                    Field("message", name="f1"), \
-                ]
-            >>> se._aggDomain(ofields[0].domain)
-            (0, 88)
-
-
-            """
-
-            if not isinstance(domain, Agg):
-                return domain.dataType.size
-
-            lsize = self._aggDomain(domain.children[0])
-            rsize = self._aggDomain(domain.children[1])
-
-            return ( lsize[0] + rsize[0], lsize[1] + rsize[1])
 
         @staticmethod
         def _integer_unitSize_8(field):

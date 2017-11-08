@@ -31,3 +31,4 @@
 
 from netzob.Export.WiresharkDissector.all import *
 from netzob.Export.ScapyExporter.all import *
+from netzob.Export.SulleyExporter.all import *
