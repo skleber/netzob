@@ -189,8 +189,8 @@ class SulleyExporter(AbstractExporter):
         :param domain: domain to extract the value of
         :return:
         """
-        return '# constant field \ns_binary("{}", fuzzable=False)'.format(
-            repr(TypeConverter.convert(domain.currentValue, BitArray, HexaString))
+        return '# constant field \ns_binary({})'.format(
+            TypeConverter.convert(domain.currentValue, BitArray, HexaString)
         )
 
 
