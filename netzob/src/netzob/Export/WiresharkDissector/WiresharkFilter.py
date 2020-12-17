@@ -31,6 +31,7 @@
 from netzob.Model.Vocabulary.Messages.L2NetworkMessage import L2NetworkMessage
 from netzob.Model.Vocabulary.Messages.L3NetworkMessage import L3NetworkMessage
 from netzob.Model.Vocabulary.Messages.L4NetworkMessage import L4NetworkMessage
+from netzob.Model.Vocabulary.Messages.RawMessage import RawMessage
 
 
 class WiresharkFilterFactory(object):
@@ -43,6 +44,8 @@ class WiresharkFilterFactory(object):
             klass = WiresharkL3Filter
         elif isinstance(msg_ref, L2NetworkMessage):
             klass = WiresharkL2Filter
+        elif isinstance(msg_ref, RawMessage):
+            klass = WiresharkRawFilter
         else:
             raise ValueError("Unable to build filter for {!r}.".format(sym))
         return klass(sym)
@@ -95,3 +98,18 @@ class WiresharkL2Filter(WiresharkFilter):
         for msg in self.sym.messages:
             for addr in [msg.l2SourceAddress, msg.l2DestinationAddress]:
                 yield ("{}.addr".format("eth"), '"{}"'.format(addr))
+
+class WiresharkRawFilter(WiresharkFilter):
+    """
+    Set a link type of DLT_USER0 = 147 for the raw protocol, so that you can assign the dissector
+    to this link type in Wireshark.
+    """
+    def __init__(self, sym):
+        super(WiresharkRawFilter, self).__init__(sym)
+        self.proto = None
+        self.pytype = int
+
+    def iterExpressions(self):
+        # for msg in self.sym.messages:
+        yield "wtap_encap", 147
+        # wtap.USER0  /  WTAP_ENCAP_USER0

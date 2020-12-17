@@ -43,6 +43,7 @@ import random
 # | Local application imports
 # +---------------------------------------------------------------------------+
 from netzob.Export.WiresharkDissector.CodeBuffer import LUACodeBuffer
+from netzob.Model.Vocabulary.Messages.RawMessage import RawMessage
 from netzob.Model.Vocabulary.Messages.L2NetworkMessage import L2NetworkMessage
 from netzob.Model.Vocabulary.Messages.L3NetworkMessage import L3NetworkMessage
 from netzob.Model.Vocabulary.Messages.L4NetworkMessage import L4NetworkMessage
@@ -91,7 +92,7 @@ class WiresharkDissector(object):
         def clean(s):
             # Respect wireshark syntax.
             # Allowed are lower characters, digits, '-', '_' and '.'
-            return re.sub("[^a-z\-_\.]", "_", str(s).lower())
+            return re.sub("[^a-z0-9\-_\.]", "_", str(s).lower())
         # sym = msg.getSymbol()
         msg = sym.messages[0]
         proto_name = clean(sym.name)
@@ -104,6 +105,8 @@ class WiresharkDissector(object):
             filter_name = msg.l3Protocol
         elif isinstance(msg, L2NetworkMessage):
             filter_name = msg.l2Protocol
+        elif isinstance(msg, RawMessage):
+            filter_name = 'None'
         else:
              self._logger.error("Cannot find a compatible protocol for {}.".format(msg))
 
